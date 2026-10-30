@@ -634,6 +634,13 @@ func StreamCaptureWithUsage(w http.ResponseWriter, r io.Reader, model string, on
 	if streamErr == nil && !sawDone {
 		streamErr = writeDONE(true)
 	}
+	if streamErr != nil && !sawDone {
+		// 上游异常断开（connection reset / 传输中途错误）：必须向下游补终止事件，
+		// 否则客户端收到半截流，报 "stream ended without a terminal event"。
+		// 与 applyEvent 错误路径同款格式（event: error + [DONE]）。
+		_ = writeErr("upstream stream ended unexpectedly: " + truncateStr(streamErr.Error(), 160))
+		_ = writeDONE(false)
+	}
 	if streamErr == nil && onDone != nil {
 		onDone(completion())
 	}

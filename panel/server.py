@@ -789,8 +789,9 @@ async def v1_passthrough(path: str, request: Request):
                                    ok=False)
                     yield text.encode()
                     return
-                ok = True
+                ok = False
                 first = True
+                saw_terminal = False   # 收到 finish_reason/[DONE] 才算完整
                 sse_buf = b""
                 async for chunk in r.aiter_bytes():
                     if first:
@@ -804,6 +805,11 @@ async def v1_passthrough(path: str, request: Request):
                                 j = json.loads(line[5:].strip() or b"null")
                                 if isinstance(j, dict):
                                     model = model or j.get("model")
+                                    for c in (j.get("choices") or []):
+                                        if c.get("finish_reason"):
+                                            saw_terminal = True
+                                    if line[5:].strip() == b"[DONE]":
+                                        saw_terminal = True
                                     u = j.get("usage") or {}
                                     if u:
                                         prompt_tok = u.get("prompt_tokens") or prompt_tok
@@ -815,6 +821,7 @@ async def v1_passthrough(path: str, request: Request):
                     if len(sse_buf) > 262144:
                         sse_buf = sse_buf[-4096:]
                     yield chunk
+                ok = saw_terminal
                 total_ms = (time.time()-t0)*1000
                 metrics.record(model=model, ttft_ms=ttft_ms, total_ms=total_ms,
                                ok=ok, prompt_tok=prompt_tok, cached_tok=cached_tok,
