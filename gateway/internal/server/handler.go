@@ -412,11 +412,20 @@ func (h *Handler) modelList() []map[string]any {
 	// 未知（还没探测出结论）的保留：宁可让用户试，也别把可用模型藏起来。
 	if len(entries) > 0 {
 		kept := make([]map[string]any, 0, len(entries))
+		seenCanonical := map[string]bool{}
 		for _, e := range entries {
 			id, _ := e["id"].(string)
-			if !h.modelKnownUnusable(id) {
-				kept = append(kept, e)
+			if h.modelKnownUnusable(id) {
+				continue
 			}
+			// 目录里同一模型常以不同大小写出现（GLM-5.2 / glm-5.2），
+			// 归一去重，避免下游模型列表翻倍。
+			canonical := upstream.CanonicalModel(id)
+			if seenCanonical[canonical] {
+				continue
+			}
+			seenCanonical[canonical] = true
+			kept = append(kept, e)
 		}
 		if len(kept) > 0 {
 			entries = kept
@@ -711,6 +720,7 @@ func (h *Handler) chatCompletions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tried := map[string]bool{}
+	var modelUnavailableErr error // 「模型未注册/福利未领」：换号可能可用，全部不可用时循环外终答
 	var lastErr error
 	for i := 0; i < h.cfg.MaxRotate; i++ {
 		var acct *pool.Account
@@ -835,10 +845,12 @@ func (h *Handler) chatCompletions(w http.ResponseWriter, r *http.Request) {
 			}
 			lastErr = serr
 			if h.handleUpstreamError(acct, model, serr) {
-				// 模型级错误：换账号也是同样结果，直接给客户端明确答复。
-				writeOpenAIError(w, http.StatusNotFound, "model_not_available",
-					"model "+model+" is not available: "+truncateMsg(serr.Error(), 200))
-				return
+				// 「模型未注册/福利未领」只说明**这个账号**没有该模型——
+				// 不同账号的模型目录不同（实测早批账号有 glm-5.3，晚批只有
+				// glm-5.2 系），换号可能就有。全部账号试完仍不可用时在
+				// 循环外统一答复 model_not_available。
+				modelUnavailableErr = serr
+				continue
 			}
 			continue
 		}
@@ -919,6 +931,11 @@ func (h *Handler) chatCompletions(w http.ResponseWriter, r *http.Request) {
 		h.cfg.Pool.NoteSuccess(acct.Name)
 
 		writeJSON(w, http.StatusOK, buildCompletion(model, comp.Reasoning, content, calls, finish, chatID, usageEstimate(msgs, comp)))
+		return
+	}
+	if modelUnavailableErr != nil {
+		writeOpenAIError(w, http.StatusNotFound, "model_not_available",
+			"model "+model+" is not available on any account: "+truncateMsg(modelUnavailableErr.Error(), 200))
 		return
 	}
 	msg := "all accounts unavailable (disabled/cooldown)"
