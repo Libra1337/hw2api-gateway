@@ -236,6 +236,12 @@ class GatewayProc:
     def start(self):
         if self.running():
             return {"ok": True, "note": "already running"}
+        # 保险丝：若本机同时跑注册工具（registrar），本地网关会与远端网关
+        # 抢刷同一批 refresh_token（单次有效），互相把对方的号刷死。
+        # 注册机所在的机器设 PANEL_ALLOW_LOCAL_GW=1 才允许本地起网关。
+        import os as _os
+        if _os.environ.get("PANEL_ALLOW_LOCAL_GW", "0") != "1":
+            return {"ok": False, "note": "local gateway disabled (set PANEL_ALLOW_LOCAL_GW=1 to allow)"}
         cfg = load_cfg()
         gw = cfg["gateway"]
         binary = os.path.join(GW_DIR, gw["binary"])

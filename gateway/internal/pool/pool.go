@@ -684,6 +684,13 @@ func (p *Pool) RefreshToken(name string) error {
 	); err != nil {
 		return fmt.Errorf("save token: %w", err)
 	}
+	// 竞态修复：STS 往返期间 SyncToDir（热重载）可能已把 acct.Auth 替换成
+	// 从磁盘读出的旧对象。这里无条件写回手里的最新对象——若未发生替换，
+	// 赋值幂等无害；若已替换，最新凭据胜出，避免 pool 持旧 refresh_token
+	// （单次有效）导致下轮刷新报 "has been used" 而整号报废。
+	acct.mu.Lock()
+	acct.Auth = authz
+	acct.mu.Unlock()
 	acct.mu.Lock()
 	acct.disabled = false
 	acct.disabledReason = ""
