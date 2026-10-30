@@ -1,0 +1,14 @@
+services:
+  hw2api:
+    build: .
+    container_name: hw2api
+    restart: unless-stopped
+    ports:
+      - "7866:7866"
+    environment:
+      CA2A_API_KEY: ${CA2A_API_KEY:?需要设置 CA2A_API_KEY（写 .env 或 export 到环境变量）}
+      TZ: Asia/Shanghai
+    volumes:
+      - ./auths:/app/auths
+      - ./data:/app/data
+      - ./config.json:/app/config.json:ro

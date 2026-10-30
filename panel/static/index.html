@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hw2api · CodeArts 控制台</title>
+<style>
+:root{
+  --bg:#09090b; --bg2:#0c0c0f; --panel:#111114; --panel2:#16161a;
+  --line:#232329; --line2:#2d2d35;
+  --tx:#fafafa; --tx2:#a1a1aa; --tx3:#71717a;
+  --acc:#f43f5e; --acc2:#fb7185; --acc-soft:rgba(244,63,94,.12);
+  --ok:#34d399; --ok-soft:rgba(52,211,153,.12);
+  --warn:#fbbf24; --err:#f87171;
+  --r:14px; --r-sm:9px;
+  --ease:cubic-bezier(.22,1,.36,1);
+  --font:-apple-system,"Segoe UI","Inter","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,"Cascadia Code","JetBrains Mono",Consolas,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--tx);font-family:var(--font);font-size:14px;
+  overflow:hidden;-webkit-font-smoothing:antialiased}
+::selection{background:var(--acc-soft)}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:4px}
+::-webkit-scrollbar-track{background:transparent}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select{font-family:inherit;color:var(--tx);background:var(--bg2);border:1px solid var(--line);
+  border-radius:var(--r-sm);padding:8px 12px;font-size:13px;outline:none;transition:border-color .18s var(--ease),box-shadow .18s var(--ease)}
+input:focus,select:focus{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}
+label{font-size:12px;color:var(--tx2);display:block;margin-bottom:6px}
+
+/* ── 布局骨架 ─────────────────────────── */
+.shell{display:grid;grid-template-rows:56px 1fr;height:100vh}
+.main{display:grid;grid-template-columns:1fr;overflow:hidden}
+.page{overflow-y:auto;padding:28px 32px;animation:pageIn .45s var(--ease)}
+@keyframes pageIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* ── 顶栏 ─────────────────────────── */
+.top{display:flex;align-items:center;gap:20px;padding:0 24px;border-bottom:1px solid var(--line);
+  background:color-mix(in srgb,var(--bg2) 82%,transparent);backdrop-filter:blur(14px);z-index:9}
+.brand{display:flex;align-items:center;gap:10px;font-weight:650;font-size:15px;letter-spacing:-.01em}
+.brand .dot{width:9px;height:9px;border-radius:50%;background:var(--acc);
+  box-shadow:0 0 12px var(--acc);animation:breathe 2.6s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:1}50%{opacity:.45}}
+.brand em{font-style:normal;color:var(--tx3);font-weight:450;font-size:12px;margin-left:2px}
+nav{display:flex;gap:2px;position:relative;height:100%}
+nav button{padding:0 16px;font-size:13.5px;color:var(--tx2);position:relative;transition:color .2s}
+nav button:hover{color:var(--tx)}
+nav button.on{color:var(--tx)}
+nav button.on::after{content:"";position:absolute;left:14px;right:14px;bottom:0;height:2px;
+  background:var(--acc);border-radius:2px 2px 0 0;animation:tabIn .3s var(--ease)}
+@keyframes tabIn{from{transform:scaleX(.4);opacity:0}to{transform:none;opacity:1}}
+.top .spacer{flex:1}
+.chip{display:flex;align-items:center;gap:7px;padding:5px 12px;border:1px solid var(--line);
+  border-radius:999px;font-size:12px;color:var(--tx2);background:var(--panel);transition:border-color .2s}
+.chip .st{width:7px;height:7px;border-radius:50%;background:var(--tx3)}
+.chip.up .st{background:var(--ok);box-shadow:0 0 8px var(--ok);animation:breathe 2s infinite}
+.chip.down .st{background:var(--err)}
+.chip.live{border-color:color-mix(in srgb,var(--ok) 40%,var(--line))}
+
+/* ── 通用卡片 ─────────────────────────── */
+.grid{display:grid;gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:18px 20px;transition:border-color .25s var(--ease),transform .25s var(--ease)}
+.card:hover{border-color:var(--line2)}
+.card h3{font-size:12.5px;font-weight:550;color:var(--tx2);margin-bottom:14px;
+  display:flex;align-items:center;gap:8px;letter-spacing:.02em}
+.card h3 svg{opacity:.7}
+
+/* ── 统计卡 ─────────────────────────── */
+.stats{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.stat .k{font-size:11.5px;color:var(--tx3);letter-spacing:.04em;text-transform:uppercase}
+.stat .v{font-size:30px;font-weight:640;letter-spacing:-.03em;margin-top:8px;
+  font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+.stat .v small{font-size:13px;color:var(--tx3);font-weight:450;margin-left:3px}
+.stat .sub{font-size:11.5px;color:var(--tx3);margin-top:6px}
+.stat.hero{background:linear-gradient(135deg,var(--panel) 0%,color-mix(in srgb,var(--acc) 7%,var(--panel)) 100%);
+  border-color:color-mix(in srgb,var(--acc) 25%,var(--line))}
+.spark{margin-top:10px;height:34px;width:100%}
+.spark path.ln{fill:none;stroke:var(--acc);stroke-width:1.6;stroke-linecap:round;
+  stroke-dasharray:400;stroke-dashoffset:400;animation:draw 1.2s var(--ease) forwards}
+.spark path.ar{fill:url(#lg);opacity:0;animation:fadeIn .8s .5s forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes fadeIn{to{opacity:1}}
+
+/* ── 大图表 ─────────────────────────── */
+.chart-wrap{height:190px;position:relative}
+.chart svg{width:100%;height:100%;overflow:visible}
+.chart .gline{stroke:var(--line);stroke-width:1;stroke-dasharray:3 5}
+.chart .area{fill:url(#lg);opacity:.9}
+.chart .line{fill:none;stroke:var(--acc2);stroke-width:2;stroke-linecap:round;
+  stroke-dasharray:900;stroke-dashoffset:900;animation:draw 1.4s var(--ease) forwards}
+.chart .dotp{fill:var(--acc2);r:3}
+.legend{display:flex;gap:16px;font-size:11.5px;color:var(--tx3);margin-top:8px}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+
+/* ── 按钮 ─────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:var(--r-sm);
+  font-size:13px;font-weight:550;transition:all .2s var(--ease);border:1px solid var(--line)}
+.btn:hover{border-color:var(--line2);background:var(--panel2);transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn.pri{background:linear-gradient(135deg,var(--acc),#e11d48);border-color:transparent;color:#fff;
+  box-shadow:0 4px 20px -6px rgba(244,63,94,.5)}
+.btn.pri:hover{box-shadow:0 6px 26px -6px rgba(244,63,94,.65);transform:translateY(-1.5px)}
+.btn.pri:disabled{opacity:.45;pointer-events:none}
+.btn.ghost{border-color:transparent;color:var(--tx2)}
+.btn.ghost:hover{color:var(--tx);background:var(--panel2)}
+.btn.danger{color:var(--err);border-color:color-mix(in srgb,var(--err) 30%,var(--line))}
+
+/* ── 账户导入 ─────────────────────────── */
+.reg-grid{grid-template-columns:340px 1fr}
+.stepper{display:flex;align-items:center;gap:10px}
+.stepper button{width:32px;height:32px;border:1px solid var(--line);border-radius:8px;font-size:16px;
+  color:var(--tx2);transition:all .15s}
+.stepper button:hover{border-color:var(--acc);color:var(--tx)}
+.stepper .n{width:76px;text-align:center;font-size:22px;font-weight:640;font-variant-numeric:tabular-nums}
+.reg-controls{display:flex;gap:12px;margin-top:16px}
+.reg-controls .ctrl{flex:1;min-width:0}
+.reg-controls .stepper{justify-content:space-between}
+.reg-controls .stepper .n{width:auto;padding:0 6px}
+.reg-go{width:100%;justify-content:center;margin-top:14px;padding:12px 18px;font-size:14px;letter-spacing:.06em}
+.prog{height:5px;background:var(--bg2);border-radius:3px;overflow:hidden;margin-top:14px}
+.prog i{display:block;height:100%;width:0;border-radius:3px;
+  background:linear-gradient(90deg,var(--acc),#fb7185);transition:width .6s var(--ease)}
+.console{background:#0a0a0d;border:1px solid var(--line);border-radius:var(--r-sm);
+  font-family:var(--mono);font-size:12px;line-height:1.75;padding:14px 16px;height:420px;
+  overflow-y:auto;position:relative}
+.console .ln{display:flex;gap:10px;animation:lnIn .3s var(--ease);white-space:pre-wrap;word-break:break-all}
+@keyframes lnIn{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
+.console .ts{color:var(--tx3);flex-shrink:0}
+.console .ok{color:var(--ok)} .console .err{color:var(--err)} .console .warn{color:var(--warn)}
+.console .idle{color:var(--tx3);text-align:center;padding-top:170px;display:block}
+.kv{display:flex;justify-content:space-between;font-size:12.5px;padding:7px 0;border-bottom:1px dashed var(--line)}
+.kv:last-child{border:none}
+.kv b{font-weight:500;color:var(--tx2)}
+.kv span{font-variant-numeric:tabular-nums}
+
+/* ── 账号表 ─────────────────────────── */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:11px;color:var(--tx3);font-weight:550;letter-spacing:.05em;
+  padding:10px 14px;border-bottom:1px solid var(--line);text-transform:uppercase}
+td{padding:12px 14px;border-bottom:1px solid color-mix(in srgb,var(--line) 55%,transparent);
+  transition:background .15s;font-variant-numeric:tabular-nums}
+tr:hover td{background:color-mix(in srgb,var(--panel2) 70%,transparent)}
+tr{animation:rowIn .35s var(--ease)}
+@keyframes rowIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;
+  font-size:11.5px;font-weight:500}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:rgba(251,191,36,.1);color:var(--warn)}
+.pill.err{background:rgba(248,113,113,.1);color:var(--err)}
+.pill.mut{background:var(--bg2);color:var(--tx3)}
+.mono{font-family:var(--mono);font-size:12px}
+
+/* ── 设置 ─────────────────────────── */
+.set-grid{grid-template-columns:repeat(auto-fit,minmax(400px,1fr))}
+.field{margin-bottom:14px}
+.field input,.field select{width:100%}
+.hint{font-size:11.5px;color:var(--tx3);margin-top:5px}
+.toast{position:fixed;bottom:26px;left:50%;transform:translate(-50%,80px);z-index:99;
+  background:var(--panel2);border:1px solid var(--line2);padding:11px 22px;border-radius:12px;
+  font-size:13px;box-shadow:0 10px 40px rgba(0,0,0,.5);transition:transform .45s var(--ease),opacity .3s;opacity:0}
+.toast.show{transform:translate(-50%,0);opacity:1}
+
+.empty{color:var(--tx3);text-align:center;padding:60px 0;font-size:13px}
+.skel{background:linear-gradient(90deg,var(--panel) 25%,var(--panel2) 50%,var(--panel) 75%);
+  background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:8px;height:14px}
+@keyframes shimmer{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0"><defs>
+<linearGradient id="lg" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#f43f5e" stop-opacity=".35"/><stop offset="1" stop-color="#f43f5e" stop-opacity="0"/>
+</linearGradient></defs></svg>
+
+<div class="shell">
+<header class="top">
+  <div class="brand"><span class="dot"></span>hw2api<em>CodeArts 反代控制台</em></div>
+  <nav id="nav">
+    <button data-p="dash" class="on">仪表盘</button>
+    <button data-p="acct">账号池</button>
+    <button data-p="logs">日志</button>
+    <button data-p="models">模型·接入</button>
+    <button data-p="set">设置</button>
+  </nav>
+  <div class="spacer"></div>
+  <div class="chip" id="chipGw"><span class="st"></span><span class="t">网关</span></div>
+</header>
+<div class="main"><div class="page" id="page"></div></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<div id="importModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:90;align-items:center;justify-content:center">
+  <div class="card" style="width:min(680px,92vw);max-height:86vh;overflow:auto;padding:20px">
+    <h3>导入账户凭据 <span style="flex:1"></span><button class="btn ghost" onclick="hideImport()" style="padding:4px 10px">✕</button></h3>
+    <div class="field"><label>选择凭据文件（可多选 codearts-*.json）</label>
+      <input type="file" id="impFiles" multiple accept=".json,application/json" style="padding:6px"></div>
+    <div class="field"><label>或直接粘贴 JSON（可多段连续粘贴）</label>
+      <textarea id="impText" rows="8" placeholder='{"user_id":"...","refresh_token":"...","access_key_id":"...","secret_access_key":"...","cloud_dragon_token":"..."}' style="font-family:ui-monospace,monospace;font-size:12px"></textarea></div>
+    <div class="hint">纯添加：已存在的同名凭据跳过不覆盖；导入后网关自动热重载（不断流）。必要字段 user_id / refresh_token / access_key_id / secret_access_key / cloud_dragon_token；建议附带 code_verifier 与 dpop_private_key（自动续期用）。</div>
+    <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+      <button class="btn pri" onclick="doImport()">导入</button>
+      <span id="impResult" class="hint"></span>
+    </div>
+  </div>
+</div>
+
+<div id="loginView" style="display:none;position:fixed;inset:0;z-index:50;align-items:center;justify-content:center;background:radial-gradient(1200px 600px at 70% -10%,rgba(244,63,94,.09),transparent),var(--bg)">
+  <div class="card" style="width:360px;padding:34px 32px;animation:pageIn .5s var(--ease)">
+    <div class="brand" style="margin-bottom:6px"><span class="dot"></span>hw2api</div>
+    <div style="font-size:20px;font-weight:680;letter-spacing:-.02em;margin-bottom:4px">控制台登录</div>
+    <div style="font-size:12.5px;color:var(--tx3);margin-bottom:22px">CodeArts 反代 · 私有部署</div>
+    <div class="field"><label>用户名</label><input id="lgUser" autocomplete="username" value="admin"></div>
+    <div class="field"><label>密码</label><input id="lgPass" type="password" autocomplete="current-password"
+      style="width:100%" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <button class="btn pri" id="lgBtn" style="width:100%;justify-content:center;margin-top:8px" onclick="doLogin()">登 录</button>
+    <div id="lgErr" style="font-size:12px;color:var(--err);margin-top:12px;min-height:16px"></div>
+  </div>
+</div>
+
+<script>
+/* ═══════════ 状态 & WS ═══════════ */
+const S = {cfg:null, hud:null, ws:null, count:3, workers:2};
+const $ = s=>document.querySelector(s);
+const page = $('#page');
+const fmt = (v,d=0)=> v==null?'—':Number(v).toLocaleString('zh-CN',{maximumFractionDigits:d});
+const esc = s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2200)}
+async function api(p,opt){const r=await fetch(p,opt);if(!r.ok)throw new Error((await r.json()).detail||r.status);return r.json()}
+
+function connectWS(){
+  const proto = location.protocol==='https:'?'wss':'ws';
+  S.ws = new WebSocket(`${proto}://${location.host}/api/ws`);
+  S.ws.onmessage = e=>{S.hud=JSON.parse(e.data);renderHUD()};
+  S.ws.onclose = ()=>setTimeout(connectWS,2000);
+}
+
+/* ═══════════ 数字滚动动画 ═══════════ */
+function countUp(el,to,dec=0,suffix=''){
+  const from = parseFloat(el.dataset.v||0); el.dataset.v=to;
+  const t0=performance.now(),dur=700;
+  (function f(t){const p=Math.min(1,(t-t0)/dur),e=1-Math.pow(1-p,3);
+    const v=from+(to-from)*e;
+    el.innerHTML = v.toLocaleString('zh-CN',{maximumFractionDigits:dec})+`<small>${suffix}</small>`;
+    if(p<1)requestAnimationFrame(f)})(t0);
+}
+
+/* ═══════════ Sparkline ═══════════ */
+function spark(series,w=220,h=34){
+  const pts=(series||[]).filter(s=>s.n!=null);
+  if(!pts.length)return '';
+  const max=Math.max(...pts.map(s=>s.n),1);
+  const step=pts.length>1?w/(pts.length-1):w;
+  const d=pts.map((s,i)=>`${i?'L':'M'}${i*step},${h-4-(s.n/max)*(h-8)}`).join(' ');
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <path class="ln" d="${d}"/><path class="ar" d="${d} L${w},${h} L0,${h} Z"/></svg>`;
+}
+
+/* ═══════════ 主图表 ═══════════ */
+function bigChart(series){
+  const pts=(series||[]).filter(s=>s.ttft!=null);
+  const w=760,h=170,px=8,py=16;
+  if(pts.length<2)return `<div class="empty" style="padding:56px 0">暂无请求样本 · 发一条消息即开始采样</div>`;
+  const vals=pts.map(s=>s.ttft);
+  const min=Math.min(...vals)*.9,max=Math.max(...vals)*1.05||1;
+  const sx=i=>px+i*(w-2*px)/(pts.length-1), sy=v=>h-py-((v-min)/(max-min))*(h-2*py);
+  const line=pts.map((s,i)=>`${i?'L':'M'}${sx(i).toFixed(1)},${sy(s.ttft).toFixed(1)}`).join(' ');
+  const dots=pts.map((s,i)=>`<circle class="dotp" cx="${sx(i).toFixed(1)}" cy="${sy(s.ttft).toFixed(1)}"><title>${new Date(s.t*1000).toLocaleTimeString()} · ${fmt(s.ttft)}ms</title></circle>`).join('');
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    ${[0.25,0.5,0.75].map(p=>`<line class="gline" x1="0" x2="${w}" y1="${h*p}" y2="${h*p}"/>`).join('')}
+    <path class="area" d="${line} L${sx(pts.length-1)},${h} L${sx(0)},${h} Z"/>
+    <path class="line" d="${line}"/>${dots}</svg>
+    <div class="legend"><span><i style="background:var(--acc2)"></i>TTFT (ms) · 近 10 分钟 / 30s 桶</span></div>`;
+}
+
+/* ═══════════ 页面渲染 ═══════════ */
+let cur='dash';
+const pages={
+  dash(){
+    const m=S.hud?.metrics||{};
+    const gw=S.hud?.gw||{}, reg=S.hud?.reg||{};
+    const nAcct=(S.hud?.accounts_n??0);
+    page.innerHTML=`
+    <div class="grid stats">
+      <div class="card stat hero"><div class="k">TTFT 首字延迟</div>
+        <div class="v" id="mTtft">—</div>
+        <div class="sub">p95 <b id="mTtft95">—</b> · 中位 <b id="mTtft50">—</b></div>${spark(m.series)}</div>
+      <div class="card stat"><div class="k">缓存命中率</div><div class="v" id="mCache">—</div>
+        <div class="sub">cached <b id="mCached">0</b> / prompt <b id="mPrompt">0</b> tokens</div></div>
+      <div class="card stat"><div class="k">吞吐 RPM</div><div class="v" id="mRpm">0</div>
+        <div class="sub">10 分钟 <b id="mReq10">0</b> 次请求</div></div>
+      <div class="card stat"><div class="k">SLA 成功率</div><div class="v" id="mSla">—</div>
+        <div class="sub">成功 <b id="mOk10">0</b> / <b id="mReq10b">0</b></div></div>
+      <div class="card stat hero"><div class="k">总剩余积分</div><div class="v" id="mCredits">—</div>
+        <div class="sub">已用 <b id="mCreditsUsed">0</b> · 每日签到 +1000/号</div></div>
+      <div class="card stat"><div class="k">账号池</div><div class="v" id="mAcct">0</div>
+        <div class="sub">网关运行 <b id="mUptime">—</b></div></div>
+    </div>
+    <div class="grid" style="grid-template-columns:2fr 1fr;margin-top:16px">
+      <div class="card chart"><h3>▤ 响应延迟</h3><div class="chart-wrap">${bigChart(m.series)}</div></div>
+      <div class="card"><h3>◈ 活动模型</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">
+        ${(m.models||[]).map(x=>`<span class="pill mut mono">${esc(x)}</span>`).join('')||'<div class="empty">—</div>'}</div>
+        <h3 style="margin-top:22px">◈ Token 用量(10min)</h3>
+        <div class="kv"><b>补全 tokens</b><span id="mComp">0</span></div>
+        <div class="kv"><b>提示词 tokens</b><span id="mPrompt2">0</span></div>
+        <div class="kv"><b>缓存命中 tokens</b><span id="mCached2">0</span></div>
+      </div>
+    </div>`;
+    renderHUD();
+  },
+  acct(){
+    const d=creditsCache;
+    const list=d&&d.accounts?d.accounts.map(a=>({
+      phone:a.phone, user_id:a.uid, ak:a.ak, expiration:a.expiration,
+      has_refresh:a.has_refresh,
+      gw:a.gw||{}, balance:a.balance||{}})): [];
+    page.innerHTML=`
+    <div class="grid stats" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+      <div class="card stat"><div class="k">总剩余积分</div><div class="v">${d&&d.total_remain!=null?fmt(d.total_remain,0):'—'}</div></div>
+      <div class="card stat"><div class="k">累计已用</div><div class="v">${d&&d.total_used!=null?fmt(d.total_used,1):'—'}</div></div>
+      <div class="card stat"><div class="k">账号数</div><div class="v">${list.length}</div></div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h3>使用者 账号池 · 状态 / 余额 / 消费
+        <span style="flex:1"></span>
+        <span style="font-size:11px;color:var(--tx3);font-weight:400">余额每 60s 从华为云 statistics 刷新</span>
+        <button class="btn ghost" onclick="reimport()" style="padding:6px 12px;font-size:12px">重新加载</button>
+        <button class="btn pri" onclick="showImport()" style="padding:6px 12px;font-size:12px">＋ 导入账户</button></h3>
+      ${list.length?`<div style="overflow-x:auto"><table><thead><tr><th>#</th><th>手机号</th><th>状态</th><th>剩余积分</th><th>已用</th><th>用量tokens</th><th>并发</th><th>签到</th><th>凭据到期</th><th>消费曲线</th></tr></thead>
+      <tbody>${list.map((a,i)=>{
+        const exp=a.expiration?new Date(a.expiration):null;
+        const left=exp?(exp-Date.now())/6e4:null;
+        const credSt=!a.expiration?'mut':(left>15?'ok':left>0?'warn':'err');
+        const gw=a.gw||{};
+        const st=gw.cooling?'cool':gw.disabled?'off':'ok';
+        const stHtml=st==='ok'?'<span class="pill ok">● 健康</span>':st==='cool'
+          ?`<span class="pill warn">◐ 冷却</span>`:'<span class="pill err">✕ 停用</span>';
+        const ck=gw.checkin;
+        const ckHtml=ck==null?'<span class="pill mut">—</span>':ck?'<span class="pill ok">✓ 已签</span>':'<span class="pill warn">未签</span>';
+        const b=a.balance||{};
+        const remainPct=b.total?Math.round(b.remain/b.total*100):null;
+        return `<tr><td class="mono">${i+1}</td>
+        <td class="mono">${esc(a.phone||'—')}</td>
+        <td>${stHtml}${gw.reason?`<div style="font-size:10.5px;color:var(--tx3);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(gw.reason)}">${esc(gw.reason)}</div>`:''}</td>
+        <td><b style="font-size:15px">${b.remain!=null?fmt(b.remain,1):'<span class=skel style=display:inline-block;width:48px></span>'}</b>
+          ${remainPct!=null?`<div style="height:3px;background:var(--bg2);border-radius:2px;margin-top:4px;width:70px"><i style="display:block;height:100%;width:${remainPct}%;background:linear-gradient(90deg,var(--ok),#a3e635);border-radius:2px"></i></div>`:''}</td>
+        <td class="mono">${b.used!=null?fmt(b.used,2):'—'}</td>
+        <td class="mono">${fmt(b.tokens||0)}</td>
+        <td class="mono">${gw.concurrent??'—'}</td>
+        <td>${ckHtml}</td>
+        <td><span class="pill ${credSt}">${left!=null?fmt(left,0)+'m':'—'}</span></td>
+        <td>${a.curve&&a.curve.length>2?miniCurve(a.curve):'<span style="color:var(--tx3)">—</span>'}</td></tr>`}).join('')}</tbody></table></div>`
+      :`<div class="empty">账号池为空 · 点右上「导入账户」添加凭据</div>`}
+    </div>`;
+  },
+  logs(){
+    page.innerHTML=`
+    <div class="card">
+      <h3>▚ 请求日志
+        <span style="flex:1"></span>
+        <span style="font-size:11px;color:var(--tx3);font-weight:400" id="logCnt"></span>
+        <button class="btn ghost" onclick="loadLogs()" style="padding:6px 12px;font-size:12px">刷新</button></h3>
+      <div style="overflow-x:auto"><table id="logTable">
+      <thead><tr><th>时间</th><th>模型</th><th>账户</th><th>耗时 / 首字</th><th>输入</th><th>输出</th><th>积分(估)</th><th>状态</th></tr></thead>
+      <tbody id="logBody"><tr><td colspan=8><span class="skel" style="display:block;width:60%"></span></td></tr></tbody>
+      </table></div>
+      <div style="display:flex;gap:10px;margin-top:14px;align-items:center">
+        <button class="btn ghost" onclick="logPage(-1)">上一页</button>
+        <span id="logPageN" style="font-size:12px;color:var(--tx2)">1</span>
+        <button class="btn ghost" onclick="logPage(1)">下一页</button></div>
+    </div>
+    <div class="card" style="margin-top:16px"><h3>▤ 每日汇总</h3>
+      <div style="overflow-x:auto"><table><thead><tr><th>日期</th><th>请求</th><th>输入tok</th><th>输出tok</th><th>积分(估)</th><th>均TTFT</th></tr></thead>
+      <tbody id="dailyBody"><tr><td colspan=6><span class="skel" style="display:block;width:50%"></span></td></tr></tbody></table></div>
+    </div>`;
+    loadLogs(); loadDaily();
+  },
+  models(){
+    page.innerHTML=`
+    <div class="grid" style="grid-template-columns:1fr 380px">
+      <div class="card"><h3>◈ 可调用模型 <span style="flex:1"></span>
+        <button class="btn ghost" style="padding:6px 12px;font-size:12px" onclick="pages.models();loadModels()">刷新</button></h3>
+        <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));margin-top:6px" id="modelGrid">
+        ${'<span class="skel" style="display:block;height:60px"></span>'.repeat(6)}</div></div>
+      <div>
+        <div class="card"><h3>⌨ API 接入</h3>
+          <div class="kv"><b>Base URL</b><span class="mono" id="apiBase">—</span></div>
+          <div class="kv"><b>API Key</b><span class="mono" id="apiKeyShow">—</span></div>
+          <div class="field" style="margin-top:12px"><label>快速测试</label>
+            <button class="btn pri" style="width:100%;justify-content:center" onclick="apiTest()">发一条 glm-5.2 测试消息</button></div>
+          <div class="hint" id="apiTestResult" style="margin-top:10px"></div>
+        </div>
+        <div class="card" style="margin-top:16px"><h3>⚙ 自动化状态</h3><div id="autoBox">加载中…</div></div>
+      </div>
+    </div>`;
+    loadModels(); loadAuto();
+  },
+  set(){
+    const c=S.cfg||{};
+    const f=(l,id,v,ph='')=>`<div class="field"><label>${l}</label><input id="${id}" value="${esc(v??'')}" placeholder="${ph}"></div>`;
+    page.innerHTML=`
+    <div class="grid set-grid">
+      <div class="card"><h3>⌘ 网关</h3>
+        ${f('监听地址','sListen',c.gateway?.listen)}
+        ${f('主 API Key（内部/运维，勿外发）','sKey',c.gateway?.api_key)}
+        <div class="field"><label>上游代理（Linux 服务器填 CN 出口守护地址）</label>
+          <input id="sUp" value="${esc(c.gateway?.upstream_proxy||'')}" placeholder="http://127.0.0.1:3128"></div>
+        <div class="hint">留空 = 本机直连（仅 CN 网络可用）；snap-access 仅 CN IP 可达</div>
+      </div>
+      <div class="card" style="grid-column:1/-1"><h3>🔑 API Keys（多把·随机生成）</h3>
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+          <input id="newKeyName" placeholder="备注名（如：给小王的）" style="flex:1;min-width:180px">
+          <button class="btn" onclick="genKey()">＋ 生成随机 Key</button>
+        </div>
+        <div id="keyList" style="display:flex;flex-direction:column;gap:6px"></div>
+        <div class="hint">所有 Key 等效可用：Authorization: Bearer sk-hw2api-…；吊销立即生效</div>
+      </div>
+    </div>
+    <div style="margin-top:18px"><button class="btn pri" onclick="saveCfg()">保存全部配置</button></div>`;
+    loadBalances(); loadKeys();
+  }
+};
+
+/* ═══════════ API Keys 管理 ═══════════ */
+async function loadKeys(){
+  try{
+    const d=await api('/api/keys');
+    const box=$('#keyList'); if(!box)return;
+    if(!d.keys.length){box.innerHTML='<div class="hint">还没有对外 Key，点上面按钮生成一把</div>';return}
+    box.innerHTML=d.keys.map(k=>`
+      <div style="display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--bd);border-radius:10px;flex-wrap:wrap">
+        <b style="min-width:64px">${esc(k.name||'—')}</b>
+        <code style="flex:1;min-width:220px;font-size:12px">${esc(k.key.slice(0,14))}…${esc(k.key.slice(-4))}</code>
+        <span class="hint" style="white-space:nowrap">${k.last_used?('最近使用 '+new Date(k.last_used*1000).toLocaleTimeString()):'未使用'}</span>
+        <button class="btn" onclick="copyText('${esc(k.key)}')">复制</button>
+        <button class="btn" style="color:#e5484d" onclick="revokeKey('${esc(k.key)}')">吊销</button>
+      </div>`).join('');
+  }catch(e){const box=$('#keyList');if(box)box.innerHTML='<div class="hint">加载失败</div>'}
+}
+async function genKey(){
+  const name=$('#newKeyName')?$('#newKeyName').value:'';
+  try{
+    const d=await api('/api/keys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+    await loadKeys();
+    if($('#newKeyName'))$('#newKeyName').value='';
+    copyText(d.key); toast('已生成并复制到剪贴板');
+  }catch(e){toast('生成失败: '+e.message)}
+}
+async function revokeKey(key){
+  if(!confirm('吊销后该 Key 立即失效，确定？'))return;
+  try{await api('/api/keys/revoke',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})});loadKeys();toast('已吊销')}
+  catch(e){toast('吊销失败: '+e.message)}
+}
+function copyText(t){
+  navigator.clipboard.writeText(t).then(()=>toast('已复制')).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();toast('已复制')});
+}
+
+function go(p){cur=p;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.p===p));pages[p]();}
+document.getElementById('nav').addEventListener('click',e=>{const b=e.target.closest('button');if(b)go(b.dataset.p)});
+
+/* ═══════════ HUD 渲染 ═══════════ */
+function renderHUD(){
+  const h=S.hud; if(!h)return;
+  const gw=h.gw||{}, reg=h.reg||{}, m=h.metrics||{};
+  const cg=$('#chipGw'); if(cg){cg.className='chip '+(gw.health?.up?'up':'down');cg.querySelector('.t').textContent=gw.health?.up?`网关 · ${h.gw_listen||''}`:'网关 · 离线'}
+
+  if(cur==='dash'){
+    const set=(id,v,d)=>{const el=$(id);if(el)countUp(el,v,d)};
+    set('#mTtft',m.ttft_p50!=null?m.ttft_p50/1000:null);
+    if(m.ttft_p50!=null){const el=$('#mTtft');el.innerHTML=(m.ttft_p50/1000).toFixed(2)+'<small>s</small>'}
+    $('#mTtft95')&&( $('#mTtft95').textContent=m.ttft_p95!=null?fmt(m.ttft_p95)+'ms':'—');
+    $('#mTtft50')&&( $('#mTtft50').textContent=m.ttft_p50!=null?fmt(m.ttft_p50)+'ms':'—');
+    if(m.cache_hit!=null){const el=$('#mCache');el.innerHTML=(m.cache_hit*100).toFixed(1)+'<small>%</small>'}else $('#mCache')&&($('#mCache').textContent='—');
+    $('#mCached')&&($('#mCached').textContent=fmt(m.cached_tok));
+    $('#mPrompt')&&($('#mPrompt').textContent=fmt(m.prompt_tok));
+    set('#mRpm',m.rpm||0); set('#mReq10',m.req_10m||0); $('#mReq10b')&&($('#mReq10b').textContent=fmt(m.req_10m||0));
+    if(m.sla!=null){const el=$('#mSla');el.innerHTML=(m.sla*100).toFixed(1)+'<small>%</small>'}else $('#mSla')&&($('#mSla').textContent='—');
+    $('#mOk10')&&($('#mOk10').textContent=fmt(m.ok_10m||0));
+    $('#mAcct')&&countUp($('#mAcct'),h.accounts_n||0);
+    $('#mUptime')&&($('#mUptime').textContent=gw.running?fmtuptime(h.gw_uptime):'—');
+    $('#mComp')&&($('#mComp').textContent=fmt(m.completion_tok));
+    $('#mPrompt2')&&($('#mPrompt2').textContent=fmt(m.prompt_tok));
+    $('#mCached2')&&($('#mCached2').textContent=fmt(m.cached_tok));
+  }
+  if(cur==='acct' && h.accounts && !page.dataset.dirty){h.accounts_n=h.accounts.length}
+}
+const fmtuptime=s=>s>86400?`${(s/86400)|0}d ${((s%86400)/3600)|0}h`:s>3600?`${(s/3600)|0}h ${((s%3600)/60)|0}m`:`${(s/60)|0}m`;
+
+/* ═══════════ 账户导入 ═══════════ */
+function showImport(){$('#importModal').style.display='flex'}
+function hideImport(){$('#importModal').style.display='none'}
+async function doImport(){
+  const files=[...($('#impFiles').files||[])];
+  const text=$('#impText').value.trim();
+  if(!files.length&&!text){toast('先选择文件或粘贴 JSON');return}
+  const out=$('#impResult'); out.textContent='导入中…';
+  const body={files:[],text};
+  for(const f of files){
+    try{ body.files.push({name:f.name, content:JSON.parse(await f.text())}) }
+    catch(e){ out.textContent='✗ '+f.name+' 不是合法 JSON'; return }
+  }
+  try{
+    const r=await api('/api/accounts/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const parts=[];
+    if(r.imported&&r.imported.length)parts.push('✓ 导入 '+r.imported.length);
+    if(r.skipped&&r.skipped.length)parts.push('跳过已存在 '+r.skipped.length);
+    if(r.invalid&&r.invalid.length)parts.push('✗ 无效 '+r.invalid.length+'（'+r.invalid[0].reason+'）');
+    out.textContent=parts.join(' · ')+(r.reload?' · '+r.reload:'');
+    toast('导入完成'); loadCredits&&loadCredits();
+  }catch(e){out.textContent='✗ '+e.message}
+}
+
+/* ═══════════ 账号/网关操作 ═══════════ */
+async function reimport(){await api('/api/gateway/restart',{method:'POST'});toast('已重导入并重启网关')}
+async function gwRestart(){await api('/api/gateway/restart',{method:'POST'});toast('网关重启中')}
+
+/* ═══════════ 设置 ═══════════ */
+async function saveCfg(){
+  const c=S.cfg;
+  c.gateway={listen:$('#sListen').value,api_key:$('#sKey').value,upstream_proxy:$('#sUp').value.trim(),binary:c.gateway?.binary||'hw2api',api_keys:c.gateway?.api_keys||[]};
+  try{await api('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(c)});
+    toast('配置已保存')}catch(e){toast('保存失败: '+e.message)}
+}
+async function loadBalances(){
+  try{
+    const c=S.cfg;
+    const eo=await fetch(`https://api.eomsg.com/zc/data.php?code=leftAmount&token=${c.eomsg?.token}`).then(r=>r.text());
+    const el=$('#eoBal'); if(el)el.textContent=eo.startsWith('ERROR')?'—':eo+' 元';
+  }catch(e){}
+  try{
+    const r=await fetch('https://api.yescaptcha.com/getBalance',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({clientKey:S.cfg?.captcha?.yescaptcha_key})}).then(r=>r.json());
+    const el=$('#ycBal'); if(el)el.textContent=r.balance??'—';
+  }catch(e){}
+}
+
+/* ═══════════ 账号详情/日志/模型 ═══════════ */
+function miniCurve(curve){
+  const w=90,h=22,vals=curve.map(c=>c.used);
+  const min=Math.min(...vals),max=Math.max(...vals)||1;
+  const step=vals.length>1?w/(vals.length-1):w;
+  const d=curve.map((c,i)=>`${i?'L':'M'}${(i*step).toFixed(1)},${(h-3-((c.used-min)/(max-min||1))*(h-6)).toFixed(1)}`).join(' ');
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><path d="${d}" fill="none" stroke="var(--acc2)" stroke-width="1.5"/></svg>`;
+}
+function renderAcctDetail(){if(cur==='acct'&&creditsCache&&creditsCache.accounts)pages.acct()}
+let logOffset=0;
+async function loadLogs(){
+  try{
+    const d=await api(`/api/requests?limit=50&offset=${logOffset}`);
+    const c=$('#logCnt'); if(c)c.textContent=`共 ${d.total} 条`;
+    const body=$('#logBody'); if(!body)return;
+    body.innerHTML=d.rows.length?d.rows.map(r=>`<tr>
+      <td class="mono" style="color:var(--tx3)">${new Date(r.ts*1000).toLocaleTimeString()}</td>
+      <td class="mono">${esc(r.model||'—')}</td>
+      <td class="mono" style="color:var(--tx2)" title="${esc(r.account)}">${esc(String(r.account).slice(-14))}</td>
+      <td class="mono">${r.total_ms?fmt(r.total_ms/1000,1)+'s':'—'} <span style="color:var(--tx3)">/ ${r.ttft_ms?fmt(r.ttft_ms/1000,1)+'s':'—'}</span></td>
+      <td class="mono">${fmt(r.prompt)}</td>
+      <td class="mono">${fmt(r.completion)}</td>
+      <td class="mono" style="color:var(--acc2)">${r.credits?r.credits.toFixed(3):'—'}</td>
+      <td>${r.ok?'<span class="pill ok">✓</span>':'<span class="pill err">✕</span>'}</td></tr>`).join('')
+      :'<tr><td colspan=8 class="empty">暂无请求 · 去发一条</td></tr>';
+    const pn=$('#logPageN'); if(pn)pn.textContent=(logOffset/50+1);
+  }catch(e){}
+}
+async function loadDaily(){
+  try{
+    const d=await api('/api/requests/daily');
+    const b=$('#dailyBody'); if(!b)return;
+    b.innerHTML=d.length?d.map(r=>`<tr><td class="mono">${r.day}</td><td class="mono">${r.n}</td>
+      <td class="mono">${fmt(r.prompt)}</td><td class="mono">${fmt(r.completion)}</td>
+      <td class="mono" style="color:var(--acc2)">${r.credits}</td>
+      <td class="mono">${r.ttft_avg?fmt(r.ttft_avg/1000,1)+'s':'—'}</td></tr>`).join('')
+      :'<tr><td colspan=6 class="empty">暂无数据</td></tr>';
+  }catch(e){}
+}
+function logPage(d){logOffset=Math.max(0,logOffset+d*50);loadLogs()}
+async function loadModels(){
+  try{
+    const d=await api('/api/models');
+    const grid=$('#modelGrid'); if(!grid)return;
+    const seen=new Set();
+    const models=(d.data||[]).filter(m=>{const k=m.id.toLowerCase();if(seen.has(k))return false;seen.add(k);return true});
+    grid.innerHTML=models.map(m=>`<div class="card" style="padding:13px 15px;animation:pageIn .4s var(--ease)">
+      <div class="mono" style="font-weight:600;font-size:13.5px">${esc(m.id)}</div>
+      <div style="font-size:11px;color:var(--tx3);margin-top:5px">ctx ${fmt(m.context_length||0)} · ${esc(m.owned_by||'codearts')}</div></div>`).join('')
+      ||'<div class="empty">无模型</div>';
+  }catch(e){const g=$('#modelGrid');if(g)g.innerHTML='<div class="empty">网关不可达</div>'}
+  // 接入信息
+  const base=$('#apiBase'),key=$('#apiKeyShow');
+  if(base)base.textContent=`${location.origin}/v1`;
+  if(key&&S.cfg)key.textContent=S.cfg.gateway?.api_key||'—';
+}
+async function loadAuto(){
+  try{
+    const d=await api('/api/automation');
+    const box=$('#autoBox'); if(!box)return;
+    const ev=d.events||{};
+    const li=(arr,color)=>arr&&arr.length?`<div style="font-family:var(--mono);font-size:10.5px;color:${color};margin-top:6px;max-height:76px;overflow-y:auto">${arr.map(esc).join('<br>')}</div>`:'<div class="hint">暂无记录</div>';
+    box.innerHTML=`
+      <div class="kv"><b>Token 自动续期</b><span class="pill ok">开启 · 提前30min</span></div>${li(ev.refresh,'var(--tx3)')}
+      <div class="kv" style="margin-top:10px"><b>每日签到</b><span class="pill ok">自动 · 1000分/号/天</span></div>${li(ev.checkin,'var(--tx3)')}
+      <div class="kv" style="margin-top:10px"><b>DPoP 保活</b><span class="pill ok">15min 间隔</span></div>${li(ev.keepalive,'var(--tx3)')}
+      <div class="kv" style="margin-top:10px"><b>账号热重载</b><span class="pill ok">注册完成自动导入</span></div>`;
+  }catch(e){const b=$('#autoBox');if(b)b.innerHTML='<div class="empty">—</div>'}
+}
+async function apiTest(){
+  const r=$('#apiTestResult'); if(r)r.innerHTML='<span style="color:var(--tx3)">请求中…</span>';
+  try{
+    const t0=performance.now();
+    const resp=await fetch('/v1/chat/completions',{method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+(S.cfg?.gateway?.api_key||'')},
+      body:JSON.stringify({model:'glm-5.2',stream:false,messages:[{role:'user',content:'回复OK'}]})});
+    const j=await resp.json();
+    const ms=performance.now()-t0;
+    if(j.choices){r.innerHTML=`<span style="color:var(--ok)">✓ ${fmt(ms)}ms</span> · 「${esc(j.choices[0].message.content||'').slice(0,30)}」`;loadLogs()}
+    else r.innerHTML=`<span style="color:var(--err)">✕ ${esc(j.error?.message||resp.status)}</span>`;
+  }catch(e){if(r)r.innerHTML=`<span style="color:var(--err)">✕ ${esc(e.message)}</span>`}
+}
+
+/* ═══════════ 启动 ═══════════ */
+let creditsCache={total_remain:null,total_used:null};
+async function pullCredits(){
+  try{const d=await api('/api/accounts/detail');
+    creditsCache=d;
+    if(cur==='dash'){const el=$('#mCredits');
+      if(el&&d.total_remain!=null)el.innerHTML=fmt(d.total_remain,0)+'<small>分</small>';
+      const u=$('#mCreditsUsed');if(u)u.textContent=fmt(d.total_used,1);}
+    if(cur==='acct')renderAcctDetail(d);
+  }catch(e){}
+}
+async function pullStatus(){
+  try{const s=await api('/api/status');
+    S.hud=S.hud||{};
+    S.hud.accounts=s.accounts;S.hud.accounts_n=s.accounts.length;
+    S.hud.gw_listen=s.gateway.listen;S.hud.gw_uptime=s.gateway.uptime;
+    if(cur==='acct'&&!s.registrar.running)pullCredits();
+    if(cur==='dash')renderHUD();
+  }catch(e){}
+}
+async function doLogin(){
+  const btn=$('#lgBtn'); btn.disabled=true; btn.textContent='验证中…';
+  $('#lgErr').textContent='';
+  try{
+    const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({user:$('#lgUser').value,password:$('#lgPass').value})});
+    if(r.ok){ location.reload(); }
+    else { const e=await r.json().catch(()=>({})); $('#lgErr').textContent=e.detail||'登录失败'; }
+  }catch(e){ $('#lgErr').textContent='网络错误'; }
+  btn.disabled=false; btn.textContent='登 录';
+}
+
+(async function(){
+  // 登录态检查
+  try{
+    const w=await fetch('/api/auth/whoami').then(r=>r.json());
+    if(!w.user){ $('#loginView').style.display='flex'; return; }
+  }catch(e){ $('#loginView').style.display='flex'; return; }
+  S.cfg=await api('/api/config');
+  await pullStatus();
+  connectWS();
+  go('dash');
+  setInterval(pullStatus,3000);
+  pullCredits(); setInterval(pullCredits,30000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+panel/panel_config.json
+panel/data/
+gateway/auths/
+gateway/bin/
+gateway/data/
+accounts/
+logs/
+__pycache__/
+*.exe
+hw2api
